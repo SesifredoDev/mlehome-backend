@@ -43,6 +43,11 @@ export async function closeMongo(): Promise<void> {
 
 async function ensureIndexes(db: Db): Promise<void> {
   await Promise.all([
+    db.collection("accounts").createIndex({ emailNormalized: 1 }, { unique: true }),
+    db.collection("accounts").createIndex({ createdAt: -1 }),
+    db.collection("refresh_tokens").createIndex({ tokenHash: 1 }, { unique: true }),
+    db.collection("refresh_tokens").createIndex({ accountId: 1, revokedAt: 1 }),
+    db.collection("refresh_tokens").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("student_links").createIndex({ code: 1 }, { unique: true }),
     db.collection("student_links").createIndex({ guardianAccountId: 1, studentId: 1 }),
     db.collection("student_links").createIndex({ tutorAccountId: 1, studentId: 1 }),

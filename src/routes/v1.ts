@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 
+import { accountRoutes } from "../modules/accounts/accounts.routes";
 import { authRoutes } from "../modules/auth/auth.routes";
 import { curriculumRoutes } from "../modules/curriculum/curriculum.routes";
 import { diaryRoutes } from "../modules/diary/diary.routes";
@@ -11,6 +12,7 @@ import { reportRoutes } from "../modules/reports/report.routes";
 import { tutorRoutes } from "../modules/tutors/tutor.routes";
 
 export const v1Routes: FastifyPluginAsync = async (app) => {
+  await app.register(accountRoutes, { prefix: "/accounts" });
   await app.register(authRoutes, { prefix: "/auth" });
   await app.register(diaryRoutes, { prefix: "/diary" });
   await app.register(evidenceRoutes, { prefix: "/evidence" });

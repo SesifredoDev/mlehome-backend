@@ -17,6 +17,12 @@ MinIO console: `http://localhost:9001` with `minioadmin` / `minioadmin`
 ## API Shape
 
 - `GET /health` and `GET /health/ready`
+- `POST /v1/accounts/register`
+- `GET /v1/accounts/me`
+- `POST /v1/auth/login`
+- `POST /v1/auth/refresh`
+- `POST /v1/auth/logout`
+- `POST /v1/auth/logout-all`
 - `POST /v1/auth/student-links`
 - `POST /v1/auth/student-links/activate`
 - `POST /v1/diary/entries`
@@ -34,9 +40,17 @@ MinIO console: `http://localhost:9001` with `minioadmin` / `minioadmin`
 - `GET /v1/curriculum/standards`
 - `GET /v1/integrations/developer/manifest`
 
-Development authentication is represented by headers:
+Production-style authentication is represented by bearer access tokens:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+Refresh tokens are opaque tokens returned by login and refresh calls. Refreshing rotates the refresh token, so clients should replace the stored refresh token every time `/v1/auth/refresh` succeeds.
+
+Development account context can still be represented by headers outside production:
 
 - `x-account-id`
 - `x-account-role` as `parent`, `child`, `tutor`, or `integration`
 
-These are placeholders for the real auth gateway/JWT layer.
+These headers are only a local development fallback. Use JWTs for app/API flows.

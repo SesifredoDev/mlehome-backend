@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
+import { requireAccount } from "../../plugins/requestContext";
 import { createDiaryEntry, getDiaryStats, listDiaryEntries } from "./diary.service";
 import { subjects } from "./diary.types";
 
@@ -47,17 +48,19 @@ const listEntriesQuerySchema = z.object({
 
 export const diaryRoutes: FastifyPluginAsync = async (app) => {
   app.post("/entries", async (request, reply) => {
+    const account = requireAccount(request);
     const body = createEntrySchema.parse(request.body);
     const entry = await createDiaryEntry({
       ...body,
-      createdByAccountId: request.account.accountId,
-      createdByRole: request.account.role
+      createdByAccountId: account.accountId,
+      createdByRole: account.role
     });
 
     reply.code(201).send({ data: entry });
   });
 
   app.get("/students/:studentId/entries", async (request) => {
+    requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
     const query = listEntriesQuerySchema.parse(request.query);
     const entries = await listDiaryEntries({
@@ -69,6 +72,7 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/students/:studentId/stats", async (request) => {
+    requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
     const query = listEntriesQuerySchema.parse(request.query);
     const stats = await getDiaryStats({

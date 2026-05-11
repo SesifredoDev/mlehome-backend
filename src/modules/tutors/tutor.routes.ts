@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
+import { requireAccount } from "../../plugins/requestContext";
 import { listStudentLinksForAccount } from "../auth/auth.service";
 import { generateTutorStatsReport } from "../reports/report.service";
 
@@ -10,7 +11,8 @@ const studentParamsSchema = z.object({
 
 export const tutorRoutes: FastifyPluginAsync = async (app) => {
   app.get("/students", async (request) => {
-    const links = await listStudentLinksForAccount(request.account.accountId, "tutor");
+    const account = requireAccount(request);
+    const links = await listStudentLinksForAccount(account.accountId, "tutor");
 
     return {
       data: links
@@ -24,6 +26,7 @@ export const tutorRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/students/:studentId/summary", async (request) => {
+    requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
     const report = await generateTutorStatsReport(params.studentId, {});
 

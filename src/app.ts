@@ -5,7 +5,7 @@ import { ZodError } from "zod";
 
 import { env } from "./config/env";
 import { healthRoutes } from "./modules/health/health.routes";
-import { requestContextPlugin } from "./plugins/requestContext";
+import { installRequestContext } from "./plugins/requestContext";
 import { v1Routes } from "./routes/v1";
 import { ApiError } from "./shared/apiError";
 
@@ -57,7 +57,7 @@ export async function buildApp() {
     origin: parseCorsOrigin(env.CORS_ORIGIN),
     credentials: true
   });
-  await app.register(requestContextPlugin);
+  installRequestContext(app);
 
   await app.register(healthRoutes, { prefix: "/health" });
   await app.register(v1Routes, { prefix: "/v1" });

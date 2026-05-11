@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
+import { requireAccount } from "../../plugins/requestContext";
 import { reviewPrivacy, savePrivacyDecision } from "./privacy.service";
 
 const privacyStatusSchema = z.enum(["pending", "approved", "needs_blur", "restricted"]);
@@ -45,6 +46,7 @@ export const privacyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.patch("/evidence/:evidenceId/decision", async (request) => {
+    requireAccount(request);
     const params = evidenceParamsSchema.parse(request.params);
     const body = privacyDecisionSchema.parse(request.body);
     const asset = await savePrivacyDecision(params.evidenceId, body);

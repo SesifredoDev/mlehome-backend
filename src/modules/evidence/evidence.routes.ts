@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
+import { requireAccount } from "../../plugins/requestContext";
 import {
   confirmEvidenceUpload,
   createEvidenceUpload,
@@ -28,16 +29,18 @@ const studentParamsSchema = z.object({
 
 export const evidenceRoutes: FastifyPluginAsync = async (app) => {
   app.post("/uploads", async (request, reply) => {
+    const account = requireAccount(request);
     const body = createUploadSchema.parse(request.body);
     const result = await createEvidenceUpload({
       ...body,
-      createdByAccountId: request.account.accountId
+      createdByAccountId: account.accountId
     });
 
     reply.code(201).send({ data: result });
   });
 
   app.post("/:evidenceId/confirm", async (request) => {
+    requireAccount(request);
     const params = evidenceParamsSchema.parse(request.params);
     const body = confirmUploadSchema.parse(request.body ?? {});
     const asset = await confirmEvidenceUpload(params.evidenceId, body.sizeBytes);
@@ -46,6 +49,7 @@ export const evidenceRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/students/:studentId", async (request) => {
+    requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
     const assets = await listEvidenceForStudent(params.studentId);
 

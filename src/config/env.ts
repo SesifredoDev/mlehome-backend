@@ -14,6 +14,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.string().min(1).default("info"),
   CORS_ORIGIN: z.string().min(1).default("*"),
+  JWT_ACCESS_SECRET: z.string().min(32).default("dev-only-change-this-access-token-secret"),
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
 
   MONGODB_URI: z.string().min(1).default("mongodb://localhost:27017/mlehome"),
   MONGODB_DB: z.string().min(1).default("mlehome"),
