@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
 import { requireAccount } from "../../plugins/requestContext";
+import { requireTutorStudentScope } from "../auth/auth.service";
 import {
   generateEducationDiaryReport,
   generateTutorStatsReport
@@ -28,8 +29,13 @@ const reportQuerySchema = z.object({
 
 export const reportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/students/:studentId/stats", async (request) => {
-    requireAccount(request);
+    const account = requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
+
+    if (account.role === "tutor") {
+      await requireTutorStudentScope(account.accountId, params.studentId, "reports:tutor");
+    }
+
     const query = reportQuerySchema.parse(request.query);
     const report = await generateTutorStatsReport(params.studentId, query);
 
@@ -37,8 +43,13 @@ export const reportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/students/:studentId/education-diary", async (request) => {
-    requireAccount(request);
+    const account = requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
+
+    if (account.role === "tutor") {
+      await requireTutorStudentScope(account.accountId, params.studentId, "reports:tutor");
+    }
+
     const query = reportQuerySchema.parse(request.query);
     const report = await generateEducationDiaryReport(params.studentId, query);
 

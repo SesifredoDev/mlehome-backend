@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
 import { requireAccount } from "../../plugins/requestContext";
+import { requireTutorStudentScope } from "../auth/auth.service";
 import { createDiaryEntry, getDiaryStats, listDiaryEntries } from "./diary.service";
 import { subjects } from "./diary.types";
 
@@ -50,6 +51,11 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   app.post("/entries", async (request, reply) => {
     const account = requireAccount(request);
     const body = createEntrySchema.parse(request.body);
+
+    if (account.role === "tutor") {
+      await requireTutorStudentScope(account.accountId, body.studentId, "entries:create");
+    }
+
     const entry = await createDiaryEntry({
       ...body,
       createdByAccountId: account.accountId,
@@ -60,8 +66,13 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/students/:studentId/entries", async (request) => {
-    requireAccount(request);
+    const account = requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
+
+    if (account.role === "tutor") {
+      await requireTutorStudentScope(account.accountId, params.studentId, "stats:read");
+    }
+
     const query = listEntriesQuerySchema.parse(request.query);
     const entries = await listDiaryEntries({
       studentId: params.studentId,
@@ -72,8 +83,13 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/students/:studentId/stats", async (request) => {
-    requireAccount(request);
+    const account = requireAccount(request);
     const params = studentParamsSchema.parse(request.params);
+
+    if (account.role === "tutor") {
+      await requireTutorStudentScope(account.accountId, params.studentId, "stats:read");
+    }
+
     const query = listEntriesQuerySchema.parse(request.query);
     const stats = await getDiaryStats({
       studentId: params.studentId,

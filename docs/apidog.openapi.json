@@ -1,0 +1,2067 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MLE Home Backend API",
+    "version": "0.1.0",
+    "description": "OpenAPI import file for Apidog. This describes the Dockerized local API for student linking, diary records, evidence uploads, OCR inference, privacy decisions, tutor summaries, reports, curriculum standards, and integration metadata."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Docker Compose API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Diary"
+    },
+    {
+      "name": "Evidence"
+    },
+    {
+      "name": "OCR"
+    },
+    {
+      "name": "Privacy"
+    },
+    {
+      "name": "Reports"
+    },
+    {
+      "name": "Tutors"
+    },
+    {
+      "name": "Curriculum"
+    },
+    {
+      "name": "Integrations"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness check",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "API is alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness check",
+        "operationId": "getReadiness",
+        "responses": {
+          "200": {
+            "description": "API dependencies are ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/student-links": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create a student link code",
+        "operationId": "createStudentLink",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStudentLinkRequest"
+              },
+              "examples": {
+                "parentCreatesTutorLink": {
+                  "value": {
+                    "studentId": "student_demo",
+                    "scopes": [
+                      "stats:read",
+                      "entries:create"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Student link code created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "List student links for current account",
+        "operationId": "listStudentLinks",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student links.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentLinkListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/student-links/activate": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Activate a student link code",
+        "operationId": "activateStudentLink",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateStudentLinkRequest"
+              },
+              "examples": {
+                "tutorActivatesCode": {
+                  "value": {
+                    "code": "07B2FD7A"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student link activated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/diary/entries": {
+      "post": {
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Create a diary entry",
+        "operationId": "createDiaryEntry",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDiaryEntryRequest"
+              },
+              "examples": {
+                "mathsEntry": {
+                  "value": {
+                    "studentId": "student_demo",
+                    "durationMinutes": 60,
+                    "subject": "maths",
+                    "title": "Fractions practice",
+                    "description": "Completed worksheet on equivalent fractions.",
+                    "curriculumTags": [
+                      {
+                        "subject": "maths",
+                        "keyStage": "KS2",
+                        "topic": "Fractions",
+                        "confidence": 0.8
+                      }
+                    ]
+                  }
+                },
+                "peEntry": {
+                  "value": {
+                    "studentId": "student_demo",
+                    "durationMinutes": 90,
+                    "subject": "pe",
+                    "title": "Skating training",
+                    "location": "Ice rink"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Diary entry created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaryEntryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/diary/students/{studentId}/entries": {
+      "get": {
+        "tags": [
+          "Diary"
+        ],
+        "summary": "List diary entries for a student",
+        "operationId": "listDiaryEntries",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/StudentIdPath"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diary entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaryEntryListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/diary/students/{studentId}/stats": {
+      "get": {
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Get diary statistics for a student",
+        "operationId": "getDiaryStats",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/StudentIdPath"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diary statistics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaryStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/evidence/uploads": {
+      "post": {
+        "tags": [
+          "Evidence"
+        ],
+        "summary": "Create a presigned evidence upload",
+        "operationId": "createEvidenceUpload",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEvidenceUploadRequest"
+              },
+              "examples": {
+                "imageUpload": {
+                  "value": {
+                    "studentId": "student_demo",
+                    "fileName": "worksheet.jpg",
+                    "mimeType": "image/jpeg",
+                    "description": "Worksheet evidence"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload URL created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceUploadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/evidence/{evidenceId}/confirm": {
+      "post": {
+        "tags": [
+          "Evidence"
+        ],
+        "summary": "Confirm an evidence upload",
+        "operationId": "confirmEvidenceUpload",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/EvidenceIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmEvidenceUploadRequest"
+              },
+              "examples": {
+                "confirmUpload": {
+                  "value": {
+                    "sizeBytes": 348120
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evidence marked as uploaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceAssetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/evidence/students/{studentId}": {
+      "get": {
+        "tags": [
+          "Evidence"
+        ],
+        "summary": "List evidence for a student",
+        "operationId": "listEvidenceForStudent",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/StudentIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evidence assets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceAssetListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ocr/infer": {
+      "post": {
+        "tags": [
+          "OCR"
+        ],
+        "summary": "Infer activity metadata from OCR text or an image object key",
+        "operationId": "inferActivity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OcrInferRequest"
+              },
+              "examples": {
+                "textInference": {
+                  "value": {
+                    "text": "Fractions and decimal worksheet"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inferred activity metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OcrInferenceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/privacy/reviews": {
+      "post": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Run a privacy review recommendation",
+        "operationId": "reviewPrivacy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivacyReviewRequest"
+              },
+              "examples": {
+                "thirdPartyChildren": {
+                  "value": {
+                    "imageContainsChildren": true,
+                    "containsThirdPartyChildren": true,
+                    "shareRequested": true,
+                    "guardianConfirmed": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Privacy recommendation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyReviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/privacy/evidence/{evidenceId}/decision": {
+      "patch": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Save privacy and sharing decisions for evidence",
+        "operationId": "savePrivacyDecision",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/EvidenceIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivacyDecisionRequest"
+              },
+              "examples": {
+                "approveWithBlur": {
+                  "value": {
+                    "privacyStatus": "needs_blur",
+                    "blurRegions": [
+                      {
+                        "x": 120,
+                        "y": 80,
+                        "width": 160,
+                        "height": 120,
+                        "reason": "Third-party child"
+                      }
+                    ],
+                    "sharePolicy": {
+                      "includeInGuardianReport": true,
+                      "includeImageInReports": false,
+                      "shareWithTutorIds": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evidence privacy decision saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceAssetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/reports/students/{studentId}/stats": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Generate tutor statistics report",
+        "operationId": "generateTutorStatsReport",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/StudentIdPath"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tutor statistics report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorStatsReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports/students/{studentId}/education-diary": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Generate guardian education diary report",
+        "operationId": "generateEducationDiaryReport",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/StudentIdPath"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "name": "includeImages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Only includes image object keys when evidence has been approved for image inclusion."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Guardian education diary report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EducationDiaryReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tutors/students": {
+      "get": {
+        "tags": [
+          "Tutors"
+        ],
+        "summary": "List active tutor-linked students",
+        "operationId": "listTutorStudents",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tutor-linked students.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorStudentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tutors/students/{studentId}/summary": {
+      "get": {
+        "tags": [
+          "Tutors"
+        ],
+        "summary": "Get tutor-facing student summary",
+        "operationId": "getTutorStudentSummary",
+        "security": [
+          {
+            "AccountIdHeader": [],
+            "AccountRoleHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AccountRoleHeader"
+          },
+          {
+            "$ref": "#/components/parameters/StudentIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tutor statistics report for the student.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorStatsReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/curriculum/standards": {
+      "get": {
+        "tags": [
+          "Curriculum"
+        ],
+        "summary": "List curriculum standards",
+        "operationId": "listCurriculumStandards",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "maths"
+            }
+          },
+          {
+            "name": "keyStage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "KS2"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Curriculum standards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurriculumStandardsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/developer/manifest": {
+      "get": {
+        "tags": [
+          "Integrations"
+        ],
+        "summary": "Get developer integration manifest",
+        "operationId": "getDeveloperManifest",
+        "responses": {
+          "200": {
+            "description": "Developer integration metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeveloperManifestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AccountIdHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-account-id",
+        "description": "Development account id header. Production should replace this with JWT claims."
+      },
+      "AccountRoleHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-account-role",
+        "description": "Development role header. Use parent, child, tutor, or integration."
+      }
+    },
+    "parameters": {
+      "AccountIdHeader": {
+        "name": "x-account-id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "example": "parent_demo"
+        }
+      },
+      "AccountRoleHeader": {
+        "name": "x-account-role",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/AccountRole"
+        }
+      },
+      "StudentIdPath": {
+        "name": "studentId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "student_demo"
+        }
+      },
+      "EvidenceIdPath": {
+        "name": "evidenceId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "evd_56fb2ae2-8939-4099-be48-6a72e7828127"
+        }
+      },
+      "FromQuery": {
+        "name": "from",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "ToQuery": {
+        "name": "to",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "LimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 50
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "AccountRole": {
+        "type": "string",
+        "enum": [
+          "parent",
+          "child",
+          "tutor",
+          "integration"
+        ],
+        "example": "parent"
+      },
+      "Subject": {
+        "type": "string",
+        "enum": [
+          "maths",
+          "english",
+          "science",
+          "pe",
+          "art",
+          "humanities",
+          "life-skills",
+          "other"
+        ]
+      },
+      "LinkScope": {
+        "type": "string",
+        "enum": [
+          "stats:read",
+          "entries:create",
+          "evidence:create",
+          "reports:tutor"
+        ]
+      },
+      "PrivacyStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "needs_blur",
+          "restricted"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "service"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "service": {
+            "type": "string",
+            "example": "mlehome-backend"
+          }
+        }
+      },
+      "ReadyResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ready"
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "mongo": {
+                "type": "string",
+                "example": "ok"
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "VALIDATION_ERROR"
+              },
+              "message": {
+                "type": "string",
+                "example": "Request validation failed."
+              },
+              "details": {
+                "type": "object"
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CreateStudentLinkRequest": {
+        "type": "object",
+        "required": [
+          "studentId"
+        ],
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "example": "student_demo"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkScope"
+            },
+            "default": [
+              "stats:read",
+              "entries:create"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ActivateStudentLinkRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "07B2FD7A"
+          }
+        }
+      },
+      "StudentLink": {
+        "type": "object",
+        "required": [
+          "_id",
+          "studentId",
+          "guardianAccountId",
+          "code",
+          "scopes",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "example": "link_9444e378-9e60-40e1-923a-86c939a4d10f"
+          },
+          "studentId": {
+            "type": "string",
+            "example": "student_demo"
+          },
+          "guardianAccountId": {
+            "type": "string",
+            "example": "parent_demo"
+          },
+          "tutorAccountId": {
+            "type": "string",
+            "example": "tutor_demo"
+          },
+          "code": {
+            "type": "string",
+            "example": "07B2FD7A"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkScope"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "active",
+              "revoked"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StudentLinkResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudentLink"
+          }
+        }
+      },
+      "StudentLinkListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentLink"
+            }
+          }
+        }
+      },
+      "CurriculumTag": {
+        "type": "object",
+        "required": [
+          "subject"
+        ],
+        "properties": {
+          "standardId": {
+            "type": "string"
+          },
+          "keyStage": {
+            "type": "string",
+            "example": "KS2"
+          },
+          "subject": {
+            "type": "string",
+            "example": "maths"
+          },
+          "topic": {
+            "type": "string",
+            "example": "Fractions"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "example": 0.8
+          }
+        }
+      },
+      "EvidenceReference": {
+        "type": "object",
+        "required": [
+          "evidenceId",
+          "includeInGuardianReport",
+          "includeImageInReports"
+        ],
+        "properties": {
+          "evidenceId": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "description": {
+            "type": "string"
+          },
+          "includeInGuardianReport": {
+            "type": "boolean",
+            "default": true
+          },
+          "includeImageInReports": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "CreateDiaryEntryRequest": {
+        "type": "object",
+        "required": [
+          "studentId",
+          "durationMinutes",
+          "subject",
+          "title"
+        ],
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "example": "student_demo"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 60
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Subject"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "example": "Fractions practice"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "tutorAccountId": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "default": []
+          },
+          "curriculumTags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurriculumTag"
+            },
+            "default": []
+          },
+          "shareWithTutorIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        }
+      },
+      "DiaryEntry": {
+        "type": "object",
+        "required": [
+          "_id",
+          "studentId",
+          "occurredAt",
+          "durationMinutes",
+          "subject",
+          "title",
+          "createdByAccountId",
+          "createdByRole",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "example": "entry_5f3029c9-6c9e-4432-aab2-8a47209f1ce2"
+          },
+          "studentId": {
+            "type": "string",
+            "example": "student_demo"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 60
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Subject"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "example": "Fractions practice"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "tutorAccountId": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            }
+          },
+          "curriculumTags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurriculumTag"
+            }
+          },
+          "shareWithTutorIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdByAccountId": {
+            "type": "string",
+            "example": "parent_demo"
+          },
+          "createdByRole": {
+            "$ref": "#/components/schemas/AccountRole"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DiaryEntryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DiaryEntry"
+          }
+        }
+      },
+      "DiaryEntryListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiaryEntry"
+            }
+          }
+        }
+      },
+      "SubjectBreakdown": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "example": "maths"
+          },
+          "minutes": {
+            "type": "integer",
+            "example": 120
+          },
+          "hours": {
+            "type": "number",
+            "example": 2
+          },
+          "entries": {
+            "type": "integer",
+            "example": 2
+          }
+        }
+      },
+      "DiaryStats": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "example": "student_demo"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totalMinutes": {
+            "type": "integer",
+            "example": 180
+          },
+          "totalHours": {
+            "type": "number",
+            "example": 3
+          },
+          "entryCount": {
+            "type": "integer",
+            "example": 3
+          },
+          "externalTutorMinutes": {
+            "type": "integer",
+            "example": 60
+          },
+          "subjectBreakdown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectBreakdown"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DiaryStatsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DiaryStats"
+          }
+        }
+      },
+      "BlurRegion": {
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0
+          },
+          "width": {
+            "type": "number",
+            "minimum": 0
+          },
+          "height": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "example": "Third-party child"
+          }
+        }
+      },
+      "EvidenceSharePolicy": {
+        "type": "object",
+        "required": [
+          "includeInGuardianReport",
+          "includeImageInReports",
+          "shareWithTutorIds"
+        ],
+        "properties": {
+          "includeInGuardianReport": {
+            "type": "boolean"
+          },
+          "includeImageInReports": {
+            "type": "boolean"
+          },
+          "shareWithTutorIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "EvidenceAsset": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "studentId": {
+            "type": "string"
+          },
+          "createdByAccountId": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_upload",
+              "uploaded",
+              "rejected"
+            ]
+          },
+          "privacyStatus": {
+            "$ref": "#/components/schemas/PrivacyStatus"
+          },
+          "blurRegions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlurRegion"
+            }
+          },
+          "sharePolicy": {
+            "$ref": "#/components/schemas/EvidenceSharePolicy"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateEvidenceUploadRequest": {
+        "type": "object",
+        "required": [
+          "studentId",
+          "fileName",
+          "mimeType"
+        ],
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "example": "student_demo"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "worksheet.jpg"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "description": {
+            "type": "string",
+            "example": "Worksheet evidence"
+          }
+        }
+      },
+      "EvidenceUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "asset": {
+                "$ref": "#/components/schemas/EvidenceAsset"
+              },
+              "uploadUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresInSeconds": {
+                "type": "integer",
+                "example": 900
+              }
+            }
+          }
+        }
+      },
+      "ConfirmEvidenceUploadRequest": {
+        "type": "object",
+        "properties": {
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 348120
+          }
+        }
+      },
+      "EvidenceAssetResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EvidenceAsset"
+          }
+        }
+      },
+      "EvidenceAssetListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceAsset"
+            }
+          }
+        }
+      },
+      "OcrInferRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "Fractions and decimal worksheet"
+          },
+          "imageObjectKey": {
+            "type": "string"
+          }
+        },
+        "description": "At least one of text or imageObjectKey is required."
+      },
+      "OcrInferenceResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "confidence": {
+                "type": "number",
+                "example": 0.72
+              },
+              "needsHumanReview": {
+                "type": "boolean"
+              },
+              "inferred": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Maths: Fractions"
+                  },
+                  "subject": {
+                    "$ref": "#/components/schemas/Subject"
+                  },
+                  "curriculumTags": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subject": {
+                          "type": "string"
+                        },
+                        "topic": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PrivacyReviewRequest": {
+        "type": "object",
+        "properties": {
+          "imageContainsChildren": {
+            "type": "boolean"
+          },
+          "containsThirdPartyChildren": {
+            "type": "boolean"
+          },
+          "shareRequested": {
+            "type": "boolean"
+          },
+          "guardianConfirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PrivacyReviewResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "privacyStatus": {
+                "$ref": "#/components/schemas/PrivacyStatus"
+              },
+              "mustBlurBeforeReport": {
+                "type": "boolean"
+              },
+              "recommendedActions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PrivacyDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "privacyStatus": {
+            "$ref": "#/components/schemas/PrivacyStatus"
+          },
+          "blurRegions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlurRegion"
+            }
+          },
+          "sharePolicy": {
+            "$ref": "#/components/schemas/EvidenceSharePolicy"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "TutorStatsReportResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "reportType": {
+                "type": "string",
+                "example": "tutor-stats"
+              },
+              "access": {
+                "type": "string",
+                "example": "statistics-only"
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "studentId": {
+                "type": "string"
+              },
+              "stats": {
+                "$ref": "#/components/schemas/DiaryStats"
+              }
+            }
+          }
+        }
+      },
+      "EducationDiaryReportResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "reportType": {
+                "type": "string",
+                "example": "guardian-education-diary"
+              },
+              "access": {
+                "type": "string",
+                "example": "guardian-controlled-evidence"
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "studentId": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DiaryEntry"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TutorStudentsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "studentId": {
+                  "type": "string"
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LinkScope"
+                  }
+                },
+                "activatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CurriculumStandard": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "keyStage": {
+            "type": "string"
+          },
+          "yearGroup": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "KS1-MATHS-NUMBER"
+          },
+          "topic": {
+            "type": "string",
+            "example": "Number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "national-curriculum",
+              "custom"
+            ]
+          }
+        }
+      },
+      "CurriculumStandardsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurriculumStandard"
+            }
+          }
+        }
+      },
+      "DeveloperManifestResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "example": "MLE Home Public API"
+              },
+              "version": {
+                "type": "string",
+                "example": "0.1.0"
+              },
+              "accountContext": {
+                "type": "object"
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LinkScope"
+                }
+              },
+              "endpoints": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
