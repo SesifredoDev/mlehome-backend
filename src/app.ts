@@ -55,7 +55,9 @@ export async function buildApp() {
   await app.register(helmet);
   await app.register(cors, {
     origin: parseCorsOrigin(env.CORS_ORIGIN),
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"]
   });
   installRequestContext(app);
 

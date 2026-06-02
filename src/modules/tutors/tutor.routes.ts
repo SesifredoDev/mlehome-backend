@@ -48,6 +48,7 @@ export const tutorRoutes: FastifyPluginAsync = async (app) => {
           return {
             studentId: link.studentId,
             studentName: childLink?.studentName ?? link.studentId,
+            age: childLink?.age ?? calculateAge(childLink?.dateOfBirth),
             keyStage: childLink?.keyStage,
             year: childLink?.year,
             guardianAccountId: link.guardianAccountId,
@@ -72,3 +73,25 @@ export const tutorRoutes: FastifyPluginAsync = async (app) => {
     return { data: report };
   });
 };
+
+function calculateAge(dateOfBirth?: string): number | undefined {
+  if (!dateOfBirth) {
+    return undefined;
+  }
+
+  const [year, month, day] = dateOfBirth.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return undefined;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const monthDelta = today.getMonth() + 1 - month;
+
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < day)) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : undefined;
+}

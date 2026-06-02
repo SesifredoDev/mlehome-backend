@@ -2,14 +2,15 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
 import { getAccountById, registerAccount, toPublicAccount } from "./accounts.service";
-import { accountRoles } from "../../shared/roles";
 import { requireAccount } from "../../plugins/requestContext";
+
+const publicAccountRoles = ["parent", "tutor", "integration"] as const;
 
 const registerAccountSchema = z.object({
   email: z.string().email(),
   password: z.string().min(10),
   displayName: z.string().min(1).max(160).optional(),
-  role: z.enum(accountRoles).default("parent")
+  role: z.enum(publicAccountRoles).default("parent")
 });
 
 export const accountRoutes: FastifyPluginAsync = async (app) => {

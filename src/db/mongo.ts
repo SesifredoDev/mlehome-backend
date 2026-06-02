@@ -42,6 +42,10 @@ export async function closeMongo(): Promise<void> {
 }
 
 async function ensureIndexes(db: Db): Promise<void> {
+  const childLinks = db.collection("child_links");
+
+  await dropIndexIfExists(childLinks, "code_1");
+
   await Promise.all([
     db.collection("accounts").createIndex({ emailNormalized: 1 }, { unique: true }),
     db.collection("accounts").createIndex({ createdAt: -1 }),
@@ -51,12 +55,36 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("student_links").createIndex({ code: 1 }, { unique: true }),
     db.collection("student_links").createIndex({ guardianAccountId: 1, studentId: 1 }),
     db.collection("student_links").createIndex({ tutorAccountId: 1, studentId: 1 }),
-    db.collection("child_links").createIndex({ code: 1 }, { unique: true }),
-    db.collection("child_links").createIndex({ guardianAccountId: 1, studentId: 1 }),
-    db.collection("child_links").createIndex({ childAccountId: 1, studentId: 1 }),
+    db.collection("guardian_links").createIndex({ code: 1 }, { unique: true }),
+    db.collection("guardian_links").createIndex({ headGuardianAccountId: 1, childLinkId: 1 }),
+    childLinks.createIndex({ guardianAccountId: 1, studentId: 1 }),
+    childLinks.createIndex({ guardianAccountIds: 1, studentId: 1 }),
+    childLinks.createIndex({ childAccountId: 1, studentId: 1 }),
     db.collection("diary_entries").createIndex({ studentId: 1, occurredAt: -1 }),
     db.collection("diary_entries").createIndex({ tutorAccountId: 1, occurredAt: -1 }),
     db.collection("evidence_assets").createIndex({ studentId: 1, createdAt: -1 }),
     db.collection("curriculum_standards").createIndex({ subject: 1, keyStage: 1 })
   ]);
+}
+
+async function dropIndexIfExists(
+  collection: Collection<Document>,
+  indexName: string
+): Promise<void> {
+  try {
+    await collection.dropIndex(indexName);
+  } catch (error) {
+    const mongoError = error as { code?: number; codeName?: string };
+
+    if (
+      mongoError.code === 26 ||
+      mongoError.code === 27 ||
+      mongoError.codeName === "NamespaceNotFound" ||
+      mongoError.codeName === "IndexNotFound"
+    ) {
+      return;
+    }
+
+    throw error;
+  }
 }

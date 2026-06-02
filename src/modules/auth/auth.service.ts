@@ -5,13 +5,28 @@ import { createId } from "../../shared/ids";
 import { nowIso } from "../../shared/time";
 import { badRequest, forbidden, notFound } from "../../shared/apiError";
 import { Account } from "../accounts/accounts.types";
-import { ChildLink, GuardianTutorAccess, LinkScope, StudentLink } from "./auth.types";
+import { registerAccount, updateAccountStatus } from "../accounts/accounts.service";
+import {
+  ChildLink,
+  ChildGuardianAccess,
+  GuardianLink,
+  GuardianTutorAccess,
+  LinkScope,
+  StudentLink
+} from "./auth.types";
+import { revokeAllRefreshTokens } from "./session.service";
 
 interface CreateStudentLinkInput {
   studentId?: string;
   childLinkId?: string;
   guardianAccountId: string;
   scopes: LinkScope[];
+  expiresAt?: string;
+}
+
+interface CreateGuardianLinkInput {
+  childLinkId: string;
+  headGuardianAccountId: string;
   expiresAt?: string;
 }
 
@@ -22,19 +37,43 @@ interface UpdateGuardianTutorChildrenInput {
   scopes?: LinkScope[];
 }
 
-interface CreateChildLinkInput {
+interface RevokeChildGuardianAccessInput {
+  childLinkId: string;
+  headGuardianAccountId: string;
   guardianAccountId: string;
-  canLogEntries?: boolean;
-  expiresAt?: string;
 }
 
-interface ActivateChildLinkInput {
-  code: string;
-  childAccountId: string;
-  studentId?: string;
+interface CreateChildLinkInput {
+  guardianAccountId: string;
   studentName: string;
+  dateOfBirth?: string;
+  age?: number;
   keyStage?: string;
   year?: string;
+  canLogEntries?: boolean;
+  loginEnabled?: boolean;
+  loginCredentials?: {
+    email: string;
+    password: string;
+    displayName?: string;
+  };
+}
+
+interface UpdateChildLinkProfileInput {
+  linkId: string;
+  guardianAccountId: string;
+  studentName: string;
+  dateOfBirth?: string;
+  age?: number;
+  keyStage?: string;
+  year?: string;
+  canLogEntries?: boolean;
+  loginEnabled?: boolean;
+  loginCredentials?: {
+    email: string;
+    password: string;
+    displayName?: string;
+  };
 }
 
 export async function createStudentLink(input: CreateStudentLinkInput): Promise<StudentLink> {
@@ -45,7 +84,7 @@ export async function createStudentLink(input: CreateStudentLinkInput): Promise<
   });
 
   if (!childLink?.studentId) {
-    throw badRequest("Create and activate a child link before generating a tutor link.");
+    throw badRequest("Create a child record before generating a tutor link.");
   }
 
   const timestamp = nowIso();
@@ -64,6 +103,102 @@ export async function createStudentLink(input: CreateStudentLinkInput): Promise<
 
   await links.insertOne(link);
   return link;
+}
+
+export async function createGuardianLink(input: CreateGuardianLinkInput): Promise<GuardianLink> {
+  const childLinks = await getCollection<ChildLink>("child_links");
+  const guardianLinks = await getCollection<GuardianLink>("guardian_links");
+  const childLink = await childLinks.findOne({
+    _id: input.childLinkId,
+    guardianAccountId: input.headGuardianAccountId,
+    status: "active"
+  });
+
+  if (!childLink) {
+    throw forbidden("Only the head parent can add guardians for this child.");
+  }
+
+  const timestamp = nowIso();
+  const link: GuardianLink = {
+    _id: createId("glink"),
+    childLinkId: childLink._id,
+    headGuardianAccountId: input.headGuardianAccountId,
+    code: await createUniqueCode(),
+    status: "pending",
+    expiresAt: input.expiresAt,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+
+  await guardianLinks.insertOne(link);
+  return link;
+}
+
+export async function activateGuardianLink(
+  code: string,
+  guardianAccountId: string
+): Promise<ChildLink> {
+  const guardianLinks = await getCollection<GuardianLink>("guardian_links");
+  const childLinks = await getCollection<ChildLink>("child_links");
+  const link = await guardianLinks.findOne({ code: code.toUpperCase() });
+
+  if (!link) {
+    throw notFound("Guardian link code was not found.");
+  }
+
+  if (link.status !== "pending") {
+    throw badRequest("Guardian link code is no longer pending.");
+  }
+
+  if (link.expiresAt && new Date(link.expiresAt).getTime() < Date.now()) {
+    throw badRequest("Guardian link code has expired.");
+  }
+
+  if (link.headGuardianAccountId === guardianAccountId) {
+    throw badRequest("The head parent already has access to this child.");
+  }
+
+  const childLink = await childLinks.findOne({
+    _id: link.childLinkId,
+    guardianAccountId: link.headGuardianAccountId,
+    status: "active"
+  });
+
+  if (!childLink) {
+    throw notFound("Child record was not found.");
+  }
+
+  const timestamp = nowIso();
+
+  await childLinks.updateOne(
+    { _id: childLink._id },
+    {
+      $addToSet: { guardianAccountIds: guardianAccountId },
+      $set: { updatedAt: timestamp }
+    }
+  );
+  await guardianLinks.updateOne(
+    { _id: link._id },
+    {
+      $set: {
+        guardianAccountId,
+        status: "active",
+        activatedAt: timestamp,
+        updatedAt: timestamp
+      }
+    }
+  );
+
+  const updatedChildLink = {
+    ...childLink,
+    guardianAccountIds: uniqueStrings([
+      ...(childLink.guardianAccountIds ?? []),
+      guardianAccountId
+    ]),
+    updatedAt: timestamp
+  };
+
+  return (await withChildLoginStatus([updatedChildLink], guardianAccountId))[0];
 }
 
 export async function activateStudentLink(code: string, tutorAccountId: string): Promise<StudentLink> {
@@ -151,9 +286,8 @@ export async function listGuardianTutorAccess(
     childFilters.length > 0
       ? await childLinksCollection
           .find({
-            guardianAccountId,
             status: "active",
-            $or: childFilters
+            $and: [guardianAccessFilter(guardianAccountId), { $or: childFilters }]
           })
           .toArray()
       : [];
@@ -189,6 +323,8 @@ export async function listGuardianTutorAccess(
           childLinkId: childLink._id,
           studentId: childLink.studentId,
           studentName: childLink.studentName,
+          dateOfBirth: childLink.dateOfBirth,
+          age: childLink.age ?? calculateAge(childLink.dateOfBirth),
           keyStage: childLink.keyStage,
           year: childLink.year,
           scopes: link.scopes,
@@ -231,14 +367,14 @@ export async function updateGuardianTutorChildren(
       ? await childLinksCollection
           .find({
             _id: { $in: requestedChildLinkIds },
-            guardianAccountId: input.guardianAccountId,
+            ...guardianAccessFilter(input.guardianAccountId),
             status: "active"
           })
           .toArray()
       : [];
 
   if (requestedChildLinks.length !== requestedChildLinkIds.length) {
-    throw badRequest("One or more selected children are not active child links.");
+    throw badRequest("One or more selected children are not active child records.");
   }
 
   const requestedChildLinkIdSet = new Set(requestedChildLinkIds);
@@ -285,7 +421,7 @@ export async function updateGuardianTutorChildren(
     const childLink = requestedChildById.get(childLinkId);
 
     if (!childLink?.studentId) {
-      throw badRequest("One or more selected children have not completed activation.");
+      throw badRequest("One or more selected children are not active child records.");
     }
 
     const existing = existingByChildKey.get(childLinkId);
@@ -317,6 +453,80 @@ export async function updateGuardianTutorChildren(
   return listGuardianTutorAccess(input.guardianAccountId);
 }
 
+export async function listChildGuardianAccess(
+  childLinkId: string,
+  headGuardianAccountId: string
+): Promise<ChildGuardianAccess[]> {
+  const childLink = await requireHeadGuardianChildLink(childLinkId, headGuardianAccountId);
+
+  return childGuardianAccessFromLink(childLink);
+}
+
+export async function revokeChildGuardianAccess(
+  input: RevokeChildGuardianAccessInput
+): Promise<ChildGuardianAccess[]> {
+  const childLinks = await getCollection<ChildLink>("child_links");
+  const guardianLinks = await getCollection<GuardianLink>("guardian_links");
+  const studentLinks = await getCollection<StudentLink>("student_links");
+  const childLink = await requireHeadGuardianChildLink(input.childLinkId, input.headGuardianAccountId);
+
+  if (input.guardianAccountId === input.headGuardianAccountId) {
+    throw badRequest("The head parent cannot be removed from their child record.");
+  }
+
+  if (!childGuardianIds(childLink).includes(input.guardianAccountId)) {
+    throw notFound("Guardian access was not found for this child.");
+  }
+
+  const timestamp = nowIso();
+
+  await childLinks.updateOne(
+    { _id: childLink._id },
+    {
+      $pull: { guardianAccountIds: input.guardianAccountId },
+      $set: { updatedAt: timestamp }
+    }
+  );
+
+  await guardianLinks.updateMany(
+    {
+      childLinkId: childLink._id,
+      headGuardianAccountId: input.headGuardianAccountId,
+      guardianAccountId: input.guardianAccountId,
+      status: "active"
+    },
+    {
+      $set: {
+        status: "revoked",
+        revokedAt: timestamp,
+        updatedAt: timestamp
+      }
+    }
+  );
+
+  if (childLink.studentId) {
+    await studentLinks.updateMany(
+      {
+        guardianAccountId: input.guardianAccountId,
+        $or: [{ childLinkId: childLink._id }, { studentId: childLink.studentId }],
+        status: "active"
+      },
+      {
+        $set: {
+          status: "revoked",
+          updatedAt: timestamp
+        }
+      }
+    );
+  }
+
+  return childGuardianAccessFromLink({
+    ...childLink,
+    guardianAccountIds: childGuardianIds(childLink).filter((id) => id !== input.guardianAccountId),
+    updatedAt: timestamp
+  });
+}
+
 export async function requireTutorStudentScope(
   tutorAccountId: string,
   studentId: string,
@@ -343,60 +553,89 @@ export async function requireTutorStudentScope(
 export async function createChildLink(input: CreateChildLinkInput): Promise<ChildLink> {
   const links = await getCollection<ChildLink>("child_links");
   const timestamp = nowIso();
+  const linkId = createId("clink");
+  const studentName = input.studentName.trim();
+
+  if (!studentName) {
+    throw badRequest("Child name is required.");
+  }
+
+  const childAccount = input.loginCredentials
+    ? await registerAccount({
+        email: input.loginCredentials.email,
+        password: input.loginCredentials.password,
+        displayName: input.loginCredentials.displayName?.trim() || studentName,
+        role: "child"
+      })
+    : undefined;
+
   const link: ChildLink = {
-    _id: createId("clink"),
+    _id: linkId,
+    studentId: `child-${linkId}`,
+    studentName,
+    dateOfBirth: input.dateOfBirth,
+    age: input.age,
+    keyStage: input.keyStage?.trim() || undefined,
+    year: input.year?.trim() || undefined,
     guardianAccountId: input.guardianAccountId,
-    code: await createUniqueChildCode(),
+    guardianAccountIds: [input.guardianAccountId],
+    childAccountId: childAccount?._id,
     canLogEntries: input.canLogEntries ?? true,
-    status: "pending",
-    expiresAt: input.expiresAt,
+    status: "active",
+    activatedAt: timestamp,
     createdAt: timestamp,
     updatedAt: timestamp
   };
 
   await links.insertOne(link);
-  return link;
+  return {
+    ...link,
+    childLoginEnabled: childAccount?.status === "active"
+  };
 }
 
-export async function activateChildLink(input: ActivateChildLinkInput): Promise<ChildLink> {
+export async function updateChildLinkProfile(
+  input: UpdateChildLinkProfileInput
+): Promise<ChildLink> {
   const links = await getCollection<ChildLink>("child_links");
-  const link = await links.findOne({ code: input.code.toUpperCase() });
+  const existing = await links.findOne({
+    _id: input.linkId,
+    ...guardianAccessFilter(input.guardianAccountId)
+  });
 
-  if (!link) {
-    throw notFound("Child link was not found.");
+  if (!existing) {
+    throw notFound("Child record was not found.");
   }
 
-  if (link.status !== "pending") {
-    throw badRequest("Child link is no longer pending.");
+  if (existing.status === "revoked") {
+    throw badRequest("Revoked child records cannot be edited.");
   }
 
-  if (link.expiresAt && new Date(link.expiresAt).getTime() < Date.now()) {
-    throw badRequest("Child link has expired.");
-  }
-
-  const studentId = input.studentId?.trim() || `child-${input.childAccountId}`;
   const studentName = input.studentName.trim();
 
   if (!studentName) {
-    throw badRequest("Child display name is required.");
+    throw badRequest("Child name is required.");
   }
 
+  const childLogin = await configureChildLogin(existing, studentName, input);
   const updates = {
-    studentId,
+    studentId: existing.studentId || `child-${existing._id}`,
     studentName,
+    dateOfBirth: input.dateOfBirth,
+    age: input.age,
     keyStage: input.keyStage?.trim() || undefined,
     year: input.year?.trim() || undefined,
-    childAccountId: input.childAccountId,
-    status: "active" as const,
-    activatedAt: nowIso(),
+    childAccountId: childLogin.childAccountId,
+    canLogEntries: input.canLogEntries ?? existing.canLogEntries,
     updatedAt: nowIso()
   };
 
-  await links.updateOne({ _id: link._id }, { $set: updates });
+  await links.updateOne({ _id: existing._id }, { $set: updates });
 
   return {
-    ...link,
-    ...updates
+    ...existing,
+    ...updates,
+    childLoginEnabled: childLogin.childLoginEnabled
   };
 }
 
@@ -406,9 +645,11 @@ export async function listChildLinksForAccount(
 ): Promise<ChildLink[]> {
   const links = await getCollection<ChildLink>("child_links");
   const filter =
-    role === "child" ? { childAccountId: accountId } : { guardianAccountId: accountId };
+    role === "child" ? { childAccountId: accountId } : guardianAccessFilter(accountId);
 
-  return links.find(filter).sort({ createdAt: -1 }).toArray();
+  const childLinks = await links.find(filter).sort({ createdAt: -1 }).toArray();
+
+  return withChildLoginStatus(childLinks, accountId);
 }
 
 export async function revokeChildLink(linkId: string, accountId: string): Promise<ChildLink> {
@@ -416,7 +657,7 @@ export async function revokeChildLink(linkId: string, accountId: string): Promis
   const existing = await links.findOne({ _id: linkId, guardianAccountId: accountId });
 
   if (!existing) {
-    throw notFound("Child link was not found.");
+    throw notFound("Child record was not found, or only the head parent can revoke it.");
   }
 
   if (existing.status === "revoked") {
@@ -437,6 +678,90 @@ export async function revokeChildLink(linkId: string, accountId: string): Promis
   };
 }
 
+async function configureChildLogin(
+  existing: ChildLink,
+  studentName: string,
+  input: Pick<UpdateChildLinkProfileInput, "loginEnabled" | "loginCredentials">
+): Promise<{ childAccountId?: string; childLoginEnabled: boolean }> {
+  let childAccountId = existing.childAccountId;
+  let childLoginEnabled = await getChildLoginEnabled(childAccountId);
+
+  if (input.loginCredentials) {
+    if (childAccountId) {
+      throw badRequest("This child already has login credentials.");
+    }
+
+    if (input.loginEnabled === false) {
+      throw badRequest("Enable child login before adding login credentials.");
+    }
+
+    const childAccount = await registerAccount({
+      email: input.loginCredentials.email,
+      password: input.loginCredentials.password,
+      displayName: input.loginCredentials.displayName?.trim() || studentName,
+      role: "child"
+    });
+    childAccountId = childAccount._id;
+    childLoginEnabled = true;
+  }
+
+  if (input.loginEnabled === undefined) {
+    return { childAccountId, childLoginEnabled };
+  }
+
+  if (input.loginEnabled) {
+    if (!childAccountId) {
+      throw badRequest("Login credentials are required to enable child login.");
+    }
+
+    await updateAccountStatus(childAccountId, "active");
+    return { childAccountId, childLoginEnabled: true };
+  }
+
+  if (childAccountId) {
+    await updateAccountStatus(childAccountId, "disabled");
+    await revokeAllRefreshTokens(childAccountId);
+  }
+
+  return { childAccountId, childLoginEnabled: false };
+}
+
+async function withChildLoginStatus(
+  childLinks: ChildLink[],
+  accountId?: string
+): Promise<ChildLink[]> {
+  const childAccountIds = uniqueStrings(
+    childLinks.flatMap((link) => (link.childAccountId ? [link.childAccountId] : []))
+  );
+
+  if (childAccountIds.length === 0) {
+    return childLinks.map((link) => withGuardianMetadata(link, accountId, false));
+  }
+
+  const accounts = await getCollection<Account>("accounts");
+  const childAccounts = await accounts.find({ _id: { $in: childAccountIds } }).toArray();
+  const childAccountById = new Map(childAccounts.map((account) => [account._id, account]));
+
+  return childLinks.map((link) => ({
+    ...withGuardianMetadata(
+      link,
+      accountId,
+      link.childAccountId ? childAccountById.get(link.childAccountId)?.status === "active" : false
+    )
+  }));
+}
+
+async function getChildLoginEnabled(childAccountId?: string): Promise<boolean> {
+  if (!childAccountId) {
+    return false;
+  }
+
+  const accounts = await getCollection<Account>("accounts");
+  const account = await accounts.findOne({ _id: childAccountId });
+
+  return account?.status === "active";
+}
+
 async function findActiveGuardianChildLink(
   guardianAccountId: string,
   input: { childLinkId?: string; studentId?: string }
@@ -447,7 +772,7 @@ async function findActiveGuardianChildLink(
     return (
       (await links.findOne({
         _id: input.childLinkId,
-        guardianAccountId,
+        ...guardianAccessFilter(guardianAccountId),
         status: "active"
       })) ?? undefined
     );
@@ -457,7 +782,7 @@ async function findActiveGuardianChildLink(
     return (
       (await links.findOne({
         studentId: input.studentId,
-        guardianAccountId,
+        ...guardianAccessFilter(guardianAccountId),
         status: "active"
       })) ?? undefined
     );
@@ -470,36 +795,139 @@ function defaultTutorScopes(): LinkScope[] {
   return ["stats:read", "entries:create", "evidence:create", "reports:tutor"];
 }
 
+async function requireHeadGuardianChildLink(
+  childLinkId: string,
+  headGuardianAccountId: string
+): Promise<ChildLink> {
+  const childLinks = await getCollection<ChildLink>("child_links");
+  const childLink = await childLinks.findOne({
+    _id: childLinkId,
+    guardianAccountId: headGuardianAccountId,
+    status: "active"
+  });
+
+  if (!childLink) {
+    throw notFound("Child record was not found, or only the head parent can manage guardian access.");
+  }
+
+  return childLink;
+}
+
+async function childGuardianAccessFromLink(childLink: ChildLink): Promise<ChildGuardianAccess[]> {
+  const guardianLinks = await getCollection<GuardianLink>("guardian_links");
+  const accounts = await getCollection<Account>("accounts");
+  const guardianIds = childGuardianIds(childLink);
+  const [linkedGuardians, guardianAccounts] = await Promise.all([
+    guardianLinks
+      .find({
+        childLinkId: childLink._id,
+        guardianAccountId: { $in: guardianIds },
+        status: "active"
+      })
+      .toArray(),
+    accounts.find({ _id: { $in: guardianIds } }).toArray()
+  ]);
+  const accountById = new Map(guardianAccounts.map((account) => [account._id, account]));
+  const activatedAtByGuardianId = new Map(
+    linkedGuardians.flatMap((link) =>
+      link.guardianAccountId ? [[link.guardianAccountId, link.activatedAt ?? link.updatedAt] as const] : []
+    )
+  );
+
+  return guardianIds
+    .map((accountId) => {
+      const account = accountById.get(accountId);
+
+      return {
+        accountId,
+        displayName: account?.displayName,
+        email: account?.email,
+        isHeadGuardian: accountId === childLink.guardianAccountId,
+        joinedAt:
+          accountId === childLink.guardianAccountId
+            ? childLink.activatedAt ?? childLink.createdAt
+            : activatedAtByGuardianId.get(accountId)
+      };
+    })
+    .sort((a, b) => {
+      if (a.isHeadGuardian) {
+        return -1;
+      }
+
+      if (b.isHeadGuardian) {
+        return 1;
+      }
+
+      return (a.displayName ?? a.email ?? a.accountId).localeCompare(
+        b.displayName ?? b.email ?? b.accountId
+      );
+    });
+}
+
+function childGuardianIds(link: ChildLink): string[] {
+  return uniqueStrings([link.guardianAccountId, ...(link.guardianAccountIds ?? [])]);
+}
+
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 }
 
+function guardianAccessFilter(accountId: string) {
+  return {
+    $or: [{ guardianAccountId: accountId }, { guardianAccountIds: accountId }]
+  };
+}
+
+function withGuardianMetadata(
+  link: ChildLink,
+  accountId: string | undefined,
+  childLoginEnabled: boolean
+): ChildLink {
+  return {
+    ...link,
+    guardianAccountIds: uniqueStrings([link.guardianAccountId, ...(link.guardianAccountIds ?? [])]),
+    isHeadGuardian: accountId ? link.guardianAccountId === accountId : undefined,
+    childLoginEnabled
+  };
+}
+
+function calculateAge(dateOfBirth?: string): number | undefined {
+  if (!dateOfBirth) {
+    return undefined;
+  }
+
+  const [year, month, day] = dateOfBirth.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return undefined;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const monthDelta = today.getMonth() + 1 - month;
+
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < day)) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : undefined;
+}
+
 async function createUniqueCode(): Promise<string> {
-  const links = await getCollection<StudentLink>("student_links");
+  const studentLinks = await getCollection<StudentLink>("student_links");
+  const guardianLinks = await getCollection<GuardianLink>("guardian_links");
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = randomBytes(4).toString("hex").toUpperCase();
-    const existing = await links.findOne({ code });
+    const [existingStudentLink, existingGuardianLink] = await Promise.all([
+      studentLinks.findOne({ code }),
+      guardianLinks.findOne({ code })
+    ]);
 
-    if (!existing) {
+    if (!existingStudentLink && !existingGuardianLink) {
       return code;
     }
   }
 
   throw badRequest("Could not allocate a unique link code. Try again.");
-}
-
-async function createUniqueChildCode(): Promise<string> {
-  const links = await getCollection<ChildLink>("child_links");
-
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const code = randomBytes(4).toString("hex").toUpperCase();
-    const existing = await links.findOne({ code });
-
-    if (!existing) {
-      return code;
-    }
-  }
-
-  throw badRequest("Could not allocate a unique child link. Try again.");
 }

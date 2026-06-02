@@ -2,14 +2,18 @@ import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
-  activateChildLink,
+  activateGuardianLink,
   activateStudentLink,
   createChildLink,
+  createGuardianLink,
+  listChildGuardianAccess,
   createStudentLink,
   listGuardianTutorAccess,
   listChildLinksForAccount,
   listStudentLinksForAccount,
+  revokeChildGuardianAccess,
   revokeChildLink,
+  updateChildLinkProfile,
   updateGuardianTutorChildren
 } from "./auth.service";
 import { linkScopes } from "./auth.types";
@@ -22,6 +26,17 @@ import {
   revokeRefreshToken
 } from "./session.service";
 
+const dateOfBirthSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must use YYYY-MM-DD format.")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Date of birth must be a real date.")
+  .refine((value) => new Date(`${value}T00:00:00.000Z`).getTime() <= Date.now(), {
+    message: "Date of birth cannot be in the future."
+  });
+
 const createStudentLinkSchema = z.object({
   studentId: z.string().min(1).optional(),
   childLinkId: z.string().min(1).optional(),
@@ -32,24 +47,51 @@ const createStudentLinkSchema = z.object({
 });
 
 const createChildLinkSchema = z.object({
-  canLogEntries: z.boolean().default(true),
-  expiresAt: z.string().datetime().optional()
+  studentName: z.string().min(1).max(160).optional(),
+  dateOfBirth: dateOfBirthSchema.optional(),
+  age: z.number().int().min(0).max(30).optional(),
+  keyStage: z.string().min(1).max(80).optional(),
+  year: z.string().min(1).max(80).optional(),
+  canLogEntries: z.boolean().default(true)
 });
 
 const activateStudentLinkSchema = z.object({
   code: z.string().min(6).max(32)
 });
 
-const activateChildLinkSchema = z.object({
-  code: z.string().min(6).max(32),
-  studentId: z.string().min(1).max(120).optional(),
+const createGuardianLinkSchema = z.object({
+  childLinkId: z.string().min(1),
+  expiresAt: z.string().datetime().optional()
+});
+
+const activateGuardianLinkSchema = z.object({
+  code: z.string().min(6).max(32)
+});
+
+const createChildLoginCredentialsSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(10),
+  displayName: z.string().min(1).max(160).optional()
+});
+
+const updateChildLinkProfileSchema = z.object({
   studentName: z.string().min(1).max(160),
+  dateOfBirth: dateOfBirthSchema.optional(),
+  age: z.number().int().min(0).max(30).optional(),
   keyStage: z.string().min(1).max(80).optional(),
-  year: z.string().min(1).max(80).optional()
+  year: z.string().min(1).max(80).optional(),
+  canLogEntries: z.boolean().optional(),
+  loginEnabled: z.boolean().optional(),
+  loginCredentials: createChildLoginCredentialsSchema.optional()
 });
 
 const revokeChildLinkParamsSchema = z.object({
   linkId: z.string().min(1)
+});
+
+const guardianAccessParamsSchema = z.object({
+  linkId: z.string().min(1),
+  guardianAccountId: z.string().min(1)
 });
 
 const tutorParamsSchema = z.object({
@@ -72,6 +114,11 @@ const refreshSchema = z.object({
 
 const logoutSchema = z.object({
   refreshToken: z.string().min(32)
+});
+
+const createChildRecordSchema = createChildLinkSchema.extend({
+  studentName: z.string().min(1).max(160),
+  loginCredentials: createChildLoginCredentialsSchema.optional()
 });
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
@@ -138,6 +185,35 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     reply.code(200).send({ data: link });
   });
 
+  app.post("/guardian-links", async (request, reply) => {
+    const account = requireAccount(request);
+
+    if (account.role !== "parent") {
+      throw forbidden("Only parent accounts can generate guardian links.");
+    }
+
+    const body = createGuardianLinkSchema.parse(request.body);
+    const link = await createGuardianLink({
+      ...body,
+      headGuardianAccountId: account.accountId
+    });
+
+    reply.code(201).send({ data: link });
+  });
+
+  app.post("/guardian-links/activate", async (request, reply) => {
+    const account = requireAccount(request);
+
+    if (account.role !== "parent") {
+      throw forbidden("Only parent accounts can activate guardian links.");
+    }
+
+    const body = activateGuardianLinkSchema.parse(request.body);
+    const link = await activateGuardianLink(body.code, account.accountId);
+
+    reply.code(200).send({ data: link });
+  });
+
   app.get("/student-links", async (request) => {
     const account = requireAccount(request);
     const role = account.role === "tutor" ? "tutor" : "guardian";
@@ -181,10 +257,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const account = requireAccount(request);
 
     if (account.role !== "parent") {
-      throw forbidden("Only parent accounts can generate child links.");
+      throw forbidden("Only parent accounts can create child records.");
     }
 
-    const body = createChildLinkSchema.parse(request.body);
+    const body = createChildRecordSchema.parse(request.body);
     const link = await createChildLink({
       ...body,
       guardianAccountId: account.accountId
@@ -193,27 +269,11 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     reply.code(201).send({ data: link });
   });
 
-  app.post("/child-links/activate", async (request, reply) => {
-    const account = requireAccount(request);
-
-    if (account.role !== "child") {
-      throw forbidden("Only child accounts can activate child links.");
-    }
-
-    const body = activateChildLinkSchema.parse(request.body);
-    const link = await activateChildLink({
-      ...body,
-      childAccountId: account.accountId
-    });
-
-    reply.code(200).send({ data: link });
-  });
-
   app.get("/child-links", async (request) => {
     const account = requireAccount(request);
 
     if (account.role !== "parent" && account.role !== "child") {
-      throw forbidden("Only parent and child accounts can list child links.");
+      throw forbidden("Only parent and child accounts can list child records.");
     }
 
     const role = account.role === "child" ? "child" : "guardian";
@@ -222,11 +282,59 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     return { data: links };
   });
 
+  app.get("/child-links/:linkId/guardians", async (request) => {
+    const account = requireAccount(request);
+
+    if (account.role !== "parent") {
+      throw forbidden("Only parent accounts can manage guardian access.");
+    }
+
+    const params = revokeChildLinkParamsSchema.parse(request.params);
+    const guardians = await listChildGuardianAccess(params.linkId, account.accountId);
+
+    return { data: guardians };
+  });
+
+  app.put("/child-links/:linkId", async (request) => {
+    const account = requireAccount(request);
+
+    if (account.role !== "parent") {
+      throw forbidden("Only parent accounts can update child details.");
+    }
+
+    const params = revokeChildLinkParamsSchema.parse(request.params);
+    const body = updateChildLinkProfileSchema.parse(request.body);
+    const link = await updateChildLinkProfile({
+      ...body,
+      linkId: params.linkId,
+      guardianAccountId: account.accountId
+    });
+
+    return { data: link };
+  });
+
+  app.delete("/child-links/:linkId/guardians/:guardianAccountId", async (request) => {
+    const account = requireAccount(request);
+
+    if (account.role !== "parent") {
+      throw forbidden("Only parent accounts can manage guardian access.");
+    }
+
+    const params = guardianAccessParamsSchema.parse(request.params);
+    const guardians = await revokeChildGuardianAccess({
+      childLinkId: params.linkId,
+      headGuardianAccountId: account.accountId,
+      guardianAccountId: params.guardianAccountId
+    });
+
+    return { data: guardians };
+  });
+
   app.post("/child-links/:linkId/revoke", async (request) => {
     const account = requireAccount(request);
 
     if (account.role !== "parent") {
-      throw forbidden("Only parent accounts can revoke child links.");
+      throw forbidden("Only parent accounts can revoke child records.");
     }
 
     const params = revokeChildLinkParamsSchema.parse(request.params);

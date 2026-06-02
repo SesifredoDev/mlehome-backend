@@ -4,7 +4,7 @@ import { createId } from "../../shared/ids";
 import { AccountRole } from "../../shared/roles";
 import { nowIso } from "../../shared/time";
 import { hashPassword } from "./password.service";
-import { Account, PublicAccount } from "./accounts.types";
+import { Account, AccountStatus, PublicAccount } from "./accounts.types";
 
 interface RegisterAccountInput {
   email: string;
@@ -54,6 +54,30 @@ export async function getAccountById(accountId: string): Promise<Account> {
   }
 
   return account;
+}
+
+export async function updateAccountStatus(
+  accountId: string,
+  status: AccountStatus
+): Promise<Account> {
+  const accounts = await getCollection<Account>("accounts");
+  const updatedAt = nowIso();
+  const result = await accounts.findOneAndUpdate(
+    { _id: accountId },
+    {
+      $set: {
+        status,
+        updatedAt
+      }
+    },
+    { returnDocument: "after" }
+  );
+
+  if (!result) {
+    throw notFound("Account was not found.");
+  }
+
+  return result;
 }
 
 export function toPublicAccount(account: Account): PublicAccount {

@@ -1154,6 +1154,15 @@
         ],
         "example": "parent"
       },
+      "PublicRegisterAccountRole": {
+        "type": "string",
+        "enum": [
+          "parent",
+          "tutor",
+          "integration"
+        ],
+        "example": "parent"
+      },
       "Subject": {
         "type": "string",
         "enum": [
@@ -1280,7 +1289,7 @@
             "example": "Demo Parent"
           },
           "role": {
-            "$ref": "#/components/schemas/AccountRole"
+            "$ref": "#/components/schemas/PublicRegisterAccountRole"
           }
         }
       },
