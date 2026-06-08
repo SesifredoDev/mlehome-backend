@@ -4,6 +4,10 @@ export const subjects = [
   "maths",
   "english",
   "science",
+  "physics",
+  "chemistry",
+  "biology",
+  "computing",
   "pe",
   "art",
   "humanities",
@@ -38,6 +42,7 @@ export interface DiaryEntry {
   occurredAt: string;
   durationMinutes: number;
   subject: Subject;
+  customSubject?: string;
   title: string;
   description?: string;
   location?: string;

@@ -69,10 +69,14 @@ export async function getDiaryStats(input: ListDiaryEntriesInput): Promise<Diary
       externalTutorMinutes += entry.durationMinutes;
     }
 
-    const current = subjectTotals.get(entry.subject) ?? { minutes: 0, entries: 0 };
+    const subjectKey =
+      entry.subject === "other" && entry.customSubject?.trim()
+        ? entry.customSubject.trim()
+        : entry.subject;
+    const current = subjectTotals.get(subjectKey) ?? { minutes: 0, entries: 0 };
     current.minutes += entry.durationMinutes;
     current.entries += 1;
-    subjectTotals.set(entry.subject, current);
+    subjectTotals.set(subjectKey, current);
   }
 
   return {

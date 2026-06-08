@@ -28,6 +28,7 @@ const createEntrySchema = z.object({
   occurredAt: z.string().datetime().default(() => new Date().toISOString()),
   durationMinutes: z.number().int().positive().max(1440),
   subject: z.enum(subjects),
+  customSubject: z.string().trim().min(1).max(80).optional(),
   title: z.string().min(1).max(160),
   description: z.string().max(4000).optional(),
   location: z.string().max(240).optional(),

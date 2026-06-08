@@ -53,7 +53,23 @@ function inferSubject(text: string): Subject {
     return "english";
   }
 
-  if (/(experiment|biology|chemistry|physics|force|plant)/.test(text)) {
+  if (/(physics|phys|force|motion|energy|electricity|circuit|wave|magnet)/.test(text)) {
+    return "physics";
+  }
+
+  if (/(chemistry|chem|atom|element|compound|reaction|acid|alkali|molecule|periodic table)/.test(text)) {
+    return "chemistry";
+  }
+
+  if (/(biology|bio|cell|organism|ecosystem|photosynthesis|plant|digestion|genetics)/.test(text)) {
+    return "biology";
+  }
+
+  if (/(computing|computer science|comp|coding|programming|algorithm|python|javascript|scratch|html|css)/.test(text)) {
+    return "computing";
+  }
+
+  if (/(experiment|science|scientific enquiry|laboratory|lab)/.test(text)) {
     return "science";
   }
 
@@ -79,9 +95,30 @@ function inferTopic(text: string, subject: Subject): string | undefined {
       [/read/, "Reading"]
     ],
     science: [
-      [/plant/, "Plants"],
-      [/force/, "Forces"],
       [/experiment/, "Scientific enquiry"]
+    ],
+    physics: [
+      [/force/, "Forces"],
+      [/electricity|circuit/, "Electricity"],
+      [/energy/, "Energy"],
+      [/wave|sound|light/, "Waves"]
+    ],
+    chemistry: [
+      [/acid|alkali/, "Acids and alkalis"],
+      [/atom|element|periodic table/, "Atoms and elements"],
+      [/reaction/, "Chemical reactions"]
+    ],
+    biology: [
+      [/plant|photosynthesis/, "Plants"],
+      [/cell/, "Cells"],
+      [/ecosystem/, "Ecosystems"],
+      [/digestion|respiration/, "Human biology"]
+    ],
+    computing: [
+      [/algorithm/, "Algorithms"],
+      [/python|javascript|scratch|coding|programming/, "Programming"],
+      [/html|css/, "Web development"],
+      [/data|database/, "Data"]
     ],
     pe: [
       [/skating/, "Skating"],
