@@ -57,7 +57,11 @@ export async function buildApp() {
     origin: parseCorsOrigin(env.CORS_ORIGIN),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Authorization", "Content-Type"]
+    allowedHeaders: ["Authorization", "Content-Type", "X-File-Name"]
+  });
+
+  app.addContentTypeParser(/^image\/.*/, { parseAs: "buffer" }, (_request, payload, done) => {
+    done(null, payload);
   });
   installRequestContext(app);
 
